@@ -904,8 +904,8 @@ async function attemptSignIn(opts) {
 function signOut() {
   password = null;
   try { sessionStorage.removeItem("dash_pw"); } catch (_) {}
-  document.querySelector("#dashboard").hidden = true;
-  document.querySelector("#auth-gate").hidden = false;
+  document.querySelector("#dashboard").style.display = "none";
+  document.querySelector("#auth-gate").style.display = "flex";
   const input = document.querySelector("#pw-input");
   if (input) { input.value = ""; input.focus(); }
   clearAuthError();
@@ -1049,8 +1049,9 @@ const state = {
   },
 };
 
-function selectWeek(week) {
+function selectWeek(week, opts) {
   if (state.selectedWeek === week) return;
+  const scroll = !(opts && opts.noScroll);
   state.selectedWeek = week;
   // reset InChange filters when switching weeks
   state.inchangeFilters[COL_TXN_REASON]   = null;
@@ -1059,10 +1060,11 @@ function selectWeek(week) {
     c.classList.toggle("selected", c.dataset.week === week);
   });
   renderDetail();
-  // Smooth scroll into view
-  setTimeout(() => {
-    $("#detail").scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 50);
+  if (scroll) {
+    setTimeout(() => {
+      $("#detail").scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
 }
 
 /* =====================================================================
@@ -1470,11 +1472,16 @@ async function loadDashboard() {
   state.cardData = aggregateCards(rows);
   renderCards(state.cardData);
   if (state.cardData.length) {
-    selectWeek(state.cardData[state.cardData.length - 1].week);
+    // noScroll: keep the user at the top of the page on first load — they
+    // should land on the Last 10 weeks overview, not the detail panel.
+    selectWeek(state.cardData[state.cardData.length - 1].week, { noScroll: true });
   }
   // Reveal dashboard / hide auth gate only after a clean render.
-  document.querySelector("#auth-gate").hidden = true;
-  document.querySelector("#dashboard").hidden = false;
+  // Setting inline style beats any CSS rule, so this can't get
+  // overridden by .auth-gate's display:flex.
+  document.querySelector("#auth-gate").style.display = "none";
+  document.querySelector("#dashboard").style.display = "block";
+  window.scrollTo({ top: 0, behavior: "auto" });
 }
 
 /* =====================================================================
