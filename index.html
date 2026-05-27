@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>B2B Übersicht — Delivery State by Week</title>
+<title>B2B Dashboard — Delivery State by Week</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -689,7 +689,7 @@
 <!-- ===== Auth gate (password screen) ===== -->
 <div id="auth-gate" class="auth-gate">
   <div class="auth-card">
-    <p class="eyebrow">B2B Übersicht · Delivery</p>
+    <p class="eyebrow">B2B Dashboard</p>
     <h1>Sign in to continue</h1>
     <p class="auth-note">
       This dashboard is access-controlled. Enter the team password to continue.
@@ -717,7 +717,7 @@
 
   <header class="masthead">
     <div>
-      <p class="eyebrow">B2B Übersicht · Delivery</p>
+      <p class="eyebrow">B2B Dashboard</p>
       <h1>Delivery State<br>by Calendar Week</h1>
     </div>
     <div class="meta">
@@ -772,7 +772,7 @@
   </section>
 
   <footer>
-    <span>B2B Übersicht / Main</span>
+    <span>B2B Dashboard / MainSource</span>
     <span></span>
   </footer>
 </div>
@@ -788,21 +788,23 @@
    as a web app. The script holds the team password (in its Script
    Properties) and reads the sheet. The page will show a configuration
    screen until this is set. */
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTCdnWMJRhta5ql0GhBtntMDeQtRjPoXU-6ebXOAVJpes9q2z7anaSpqIGDZbTmhj3MA/exec";
+const APPS_SCRIPT_URL = "";
 
-const SHEET_NAME = "Main";  // sheet/tab name, used only in error messages
+const SHEET_NAME = "MainSource";  // sheet/tab name, used only in error messages
 
-const COL_WEEK         = "Start_CW ChangeProcess";
-const COL_STATE        = "Delivery State";
-const COL_DENIAL       = "Denial Reason";
-const COL_LP_TYPE      = "LastProcess Type";
-const COL_LP_ANSWER    = "LastProcess AnswerType";
-const COL_TXN_REASON   = "Transaction Reason";
-const COL_STARTED_WITH = "ChangeProcess Started With";
-const COL_DSO          = "DSO Name";
-const COL_PREV_SUPP    = "Previous Supplier";
-const COL_LP_DESC      = "LastProcess AnswerDescription";
-const COL_CONTRACT     = "Contract Number";
+/* Column names — these MUST match the header row in the live sheet
+   exactly. The current values reflect the live "Main" tab. */
+const COL_WEEK         = "StartCP_CW";
+const COL_STATE        = "DeliveryState";
+const COL_DENIAL       = "DenialReason";
+const COL_LP_TYPE      = "LPT";
+const COL_LP_ANSWER    = "LPAT";
+const COL_TXN_REASON   = "TransactionReason";
+const COL_STARTED_WITH = "CPStartedWith";
+const COL_DSO          = "DSOName";
+const COL_PREV_SUPP    = "PreviousSupplier";
+const COL_LP_DESC      = "LPAD";
+const COL_CONTRACT     = "ContractNumber";
 
 /* Examples (Contract Numbers) shown per row at the deepest mini-window
    layer. Increase or decrease as needed. */
