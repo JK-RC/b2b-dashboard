@@ -1,0 +1,1484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B2B Übersicht — Delivery State by Week</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --c-delivery:           #b9e4c5;
+    --c-delivery-pending:   #c4dff0;
+    --c-revoked:            #f7e6a8;
+    --c-denied:             #f7c89a;
+    --c-cancelled:          #f1aeae;
+    --c-cancelled-delivery: #d98787;
+    --c-inchange:           #d6d6d6;
+
+    --bg:        #f6f3ec;
+    --paper:     #ffffff;
+    --ink:       #1d1c1a;
+    --ink-soft:  #6a6760;
+    --ink-faint: #a7a39b;
+    --rule:      #e6e2d8;
+    --rule-soft: #f0ece2;
+    --rule-strong: rgba(0,0,0,0.22);
+
+    /* Process-status row layering — keep the same warm hue family,
+       Process > Status > main panel in increasing lightness. */
+    --row-process-bg: #e7e0cc;
+    --row-status-bg:  #f3efe2;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 48px 40px 80px;
+  }
+
+  /* ---------- Header ---------- */
+  .masthead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 20px;
+    margin-bottom: 36px;
+  }
+  .masthead .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 10px;
+  }
+  .masthead h1 {
+    font-family: "Bricolage Grotesque", serif;
+    font-weight: 600;
+    font-size: clamp(32px, 4vw, 52px);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .masthead .meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .meta .status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 9px; border: 1px solid var(--ink);
+    border-radius: 999px; font-weight: 500; background: var(--paper);
+  }
+  .meta .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft); }
+  .meta .status.live::before    { background: #2f8f4e; }
+  .meta .status.sample::before  { background: #b8800a; }
+  .meta .status.error::before   { background: #b53b3b; }
+
+  .meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .sheet-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px;
+    border: 1px solid var(--ink);
+    border-radius: 999px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+    white-space: nowrap;
+  }
+  .sheet-btn:hover { background: var(--ink); color: var(--paper); }
+  .sheet-btn svg { flex-shrink: 0; }
+
+  .user-block {
+    display: flex; align-items: center; gap: 10px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .user-block #user-email { letter-spacing: 0.01em; }
+  .user-block button {
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--ink-faint);
+    padding: 0 0 1px;
+    font-family: inherit;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .user-block button:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+  /* ===== Auth gate ===== */
+  .auth-gate {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 24px;
+    background: var(--bg);
+  }
+  .auth-card {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 44px 40px 36px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+  }
+  .auth-card .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 12px;
+  }
+  .auth-card h1 {
+    font-family: "Bricolage Grotesque", serif;
+    font-weight: 600;
+    font-size: 32px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+  }
+  .auth-card .auth-note {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin: 0 0 28px;
+  }
+  .auth-card .auth-note strong {
+    color: var(--ink);
+    font-weight: 500;
+  }
+  #signin-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .pw-input {
+    width: 100%;
+    padding: 11px 14px;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    box-sizing: border-box;
+    transition: border-color 120ms ease;
+  }
+  .pw-input:focus {
+    outline: none;
+    border-color: var(--ink);
+  }
+  .pw-input::placeholder { color: var(--ink-faint); }
+  .signin-btn {
+    width: 100%;
+    padding: 11px 22px;
+    background: var(--ink);
+    color: var(--paper);
+    border: 1px solid var(--ink);
+    border-radius: 4px;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 120ms ease;
+  }
+  .signin-btn:hover:not(:disabled) { opacity: 0.86; }
+  .signin-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .auth-error {
+    margin-top: 20px;
+    padding: 10px 14px;
+    background: #fdf3f3;
+    border: 1px solid #f3c8c8;
+    border-radius: 4px;
+    color: #b53b3b;
+    font-size: 12.5px;
+    text-align: left;
+  }
+  .auth-foot {
+    margin-top: 26px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+  }
+
+  /* ---------- Section head ---------- */
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 22px;
+  }
+  .section-head h2 {
+    font-family: "Bricolage Grotesque", serif;
+    font-weight: 500; font-size: 22px; letter-spacing: -0.01em; margin: 0;
+  }
+  .section-head .sub {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.12em;
+  }
+
+  /* ---------- Card grid ---------- */
+  .grid {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(2, auto); gap: 16px;
+  }
+  @media (max-width: 1100px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 720px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 460px)  { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 16px 16px 14px;
+    display: flex; flex-direction: column; gap: 12px;
+    cursor: pointer;
+    transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+    position: relative;
+  }
+  .card:hover { border-color: var(--ink); }
+  .card.selected {
+    border-color: var(--ink);
+    box-shadow: 0 0 0 1px var(--ink);
+  }
+  .card.selected::after {
+    content: "";
+    position: absolute; left: -1px; right: -1px; bottom: -16px;
+    border-bottom: 16px solid transparent;
+    border-left: 16px solid transparent;
+    border-right: 16px solid transparent;
+  }
+  .card-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  }
+  .card-week {
+    font-family: "Bricolage Grotesque", serif;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .card.selected .card-week { color: var(--ink); }
+  .card-total { text-align: right; }
+  .card-total .num {
+    font-family: "Bricolage Grotesque", serif; font-weight: 500;
+    font-size: 20px; line-height: 1; letter-spacing: -0.01em;
+    color: var(--ink-soft);
+    display: block;
+  }
+  .card-total .label {
+    font-family: "IBM Plex Mono", monospace; font-size: 9px;
+    color: var(--ink-faint); letter-spacing: 0.1em;
+    text-transform: uppercase; margin-top: 4px; display: block;
+  }
+
+  .bar {
+    display: flex; height: 10px; width: 100%;
+    border-radius: 2px; overflow: hidden; background: #efece4;
+  }
+  .bar-seg { height: 100%; transition: filter 120ms ease; }
+  .bar-seg:hover { filter: brightness(0.92); }
+
+  .legend { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; }
+  .legend-row {
+    display: grid; grid-template-columns: 10px 1fr auto auto;
+    align-items: center; gap: 8px; font-size: 12px;
+  }
+  .swatch {
+    width: 10px; height: 10px; border-radius: 2px;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .legend-name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-count, .legend-pct {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .legend-count { color: var(--ink-soft); }
+  .legend-pct   { color: var(--ink); font-weight: 500; min-width: 42px; text-align: right; }
+
+  .card.empty { opacity: 0.55; cursor: default; }
+  .card.empty:hover { border-color: var(--rule); box-shadow: none; }
+  .card.empty .empty-msg {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    color: var(--ink-faint); text-transform: uppercase;
+    letter-spacing: 0.1em; padding: 8px 0;
+  }
+
+  /* ---------- Detail section ---------- */
+  .detail {
+    margin-top: 56px;
+    border-top: 1px solid var(--ink);
+    padding-top: 32px;
+  }
+  .detail-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .detail-head .week-tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .detail-head h2 {
+    font-family: "Bricolage Grotesque", serif; font-weight: 600;
+    font-size: 36px; letter-spacing: -0.02em; margin: 4px 0 0;
+  }
+  .detail-head .total-pill {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    color: var(--ink-soft); white-space: nowrap;
+  }
+
+  .panel {
+    margin-top: 28px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 20px 22px;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 10px;
+    padding-bottom: 14px; margin-bottom: 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .panel-dot {
+    width: 10px; height: 10px; border-radius: 2px;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .panel-title {
+    font-family: "Bricolage Grotesque", serif;
+    font-weight: 600; font-size: 18px; letter-spacing: -0.01em;
+  }
+  .panel-stat {
+    font-family: "Bricolage Grotesque", serif;
+    font-weight: 600;
+    font-size: 22px;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    flex: 1;
+    /* slight nudge to align baseline with the smaller title */
+    margin-left: 2px;
+  }
+  .panel-stat .panel-stat-label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 9.5px;
+    color: var(--ink-faint);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-left: 5px;
+    position: relative;
+    top: -1px;
+  }
+  .panel-meta {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    color: var(--ink-soft); white-space: nowrap;
+  }
+
+  /* Filter rows */
+  .filters {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .filter-line {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .filter-label {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft);
+    min-width: 220px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--paper);
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 120ms ease;
+    font-family: "IBM Plex Sans", sans-serif;
+  }
+  .chip:hover { border-color: var(--ink-soft); }
+  .chip.active {
+    background: var(--ink); color: #fff; border-color: var(--ink);
+  }
+  .chip .chip-count {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    opacity: 0.7; font-variant-numeric: tabular-nums;
+  }
+  .chip.active .chip-count { opacity: 0.7; }
+
+  .chip-mini {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px;
+    padding: 3px 8px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-soft); cursor: pointer;
+    background: transparent; border: none;
+  }
+  .chip-mini:hover { color: var(--ink); }
+
+  /* InChange 3-window grid */
+  .windows {
+    display: grid; grid-template-columns: 1fr; gap: 16px;
+  }
+
+  .window {
+    background: var(--rule-soft);
+    border-radius: 3px;
+    padding: 14px 16px 12px;
+  }
+  .window h3 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 10px;
+    font-weight: 500;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .window h3 .w-total {
+    color: var(--ink); font-weight: 600;
+  }
+
+  .bar-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 8px 5px 8px;
+    margin-left: -8px; margin-right: -8px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-row::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+    width: var(--w, 0%);
+    background: var(--bar, rgba(29,28,26,0.06));
+    z-index: 0;
+    border-radius: 2px;
+    transition: width 200ms ease;
+  }
+  .bar-row > * { position: relative; z-index: 1; }
+  .bar-row .br-name {
+    font-size: 13px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .bar-row .br-count {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .bar-row .br-pct {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; font-weight: 500;
+    font-variant-numeric: tabular-nums; min-width: 44px; text-align: right;
+  }
+  /* Name cell with optional Contract Number examples below */
+  .bar-row .br-namecell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;            /* let inner ellipsis work inside grid cell */
+  }
+  .bar-row .br-examples {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-row.has-examples { align-items: flex-start; }
+  /* In wrap-names columns (Denial Reason), let examples wrap too. */
+  .window.mini-window.wrap-names .bar-row .br-examples {
+    white-space: normal;
+  }
+  /* Process status hierarchy */
+  .ps-parent {
+    margin-top: 3px;
+    padding: 7px 8px;
+    background: var(--row-process-bg);
+    border-radius: 3px;
+  }
+  .ps-parent::before { display: none; }   /* no background bar on parents */
+  .ps-parent.ps-divider {
+    margin-top: 22px;
+    position: relative;
+    overflow: visible;  /* allow the ::after divider above the row */
+  }
+  /* Draw the inter-process separator in the gap above the row, NOT on
+     the row itself, so the parent row's background stays a clean
+     rectangle. */
+  .ps-parent.ps-divider::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0;
+    top: -12px;     /* halfway through the 22px margin */
+    height: 1px;
+    background: var(--rule-strong);
+  }
+  .ps-parent .ps-typename {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 600;
+  }
+  .ps-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+
+  /* Sub-rows (Denial / Open / Approval / Unknown) — lighter background,
+     darker than the panel paper so they read as a layer above it. */
+  .ps-sub {
+    margin-left: 14px;
+    margin-top: 2px;
+    padding: 5px 8px;
+    background: var(--row-status-bg);
+    border-radius: 3px;
+  }
+  .ps-sub::before { display: none; }   /* kill the .bar-row bar background */
+  .ps-sub .ps-subname {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12.5px;
+  }
+  .ps-sub .ps-elbow {
+    color: var(--ink-faint);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+  }
+  .ps-sub .ps-answer { color: var(--ink); }
+  .ps-sub .ps-chev {
+    font-size: 9px;
+    color: var(--ink-faint);
+    margin-left: 2px;
+    transition: transform 150ms ease;
+    display: inline-block;
+  }
+  .ps-sub.expandable { cursor: pointer; }
+  .ps-sub.expandable:hover .ps-answer { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .ps-sub.expandable.open .ps-chev { transform: rotate(180deg); }
+  .ps-sub.expandable.open .ps-answer { font-weight: 600; }
+
+  /* Drill-down container — flex grid of mini-windows */
+  .ps-drill {
+    margin: 4px 0 10px 36px;
+    padding: 14px 16px;
+    background: rgba(214,214,214,0.18);
+    border-left: 2px solid var(--c-inchange);
+    border-radius: 0 3px 3px 0;
+  }
+  /* Denial drill-down uses the same neutral container as the others. */
+
+  .ps-drill-grid {
+    display: grid;
+    gap: 20px;
+  }
+  .ps-drill-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .ps-drill-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  /* Thin vertical separator between adjacent mini-windows */
+  .ps-drill-grid > .mini-window + .mini-window {
+    border-left: 1px solid rgba(0,0,0,0.09);
+    padding-left: 20px;
+  }
+  @media (max-width: 1100px) {
+    .ps-drill-grid.cols-3, .ps-drill-grid.cols-2 { grid-template-columns: 1fr; }
+    .ps-drill-grid > .mini-window + .mini-window {
+      border-left: none;
+      padding-left: 0;
+      padding-top: 14px;
+      border-top: 1px solid rgba(0,0,0,0.09);
+    }
+  }
+
+  /* Mini-windows inside drill-downs are visually lighter than the
+     outer window — flat (no extra inner background) so the orange/grey
+     drill-down container provides the framing. */
+  .window.mini-window {
+    background: transparent;
+    padding: 0;
+  }
+  .window.mini-window h3 {
+    font-size: 9.5px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .window.mini-window .bar-row {
+    padding: 4px 6px;
+    margin-left: -6px; margin-right: -6px;
+  }
+  .window.mini-window.wrap-names .bar-row .br-name {
+    white-space: normal;
+    overflow: visible;
+    line-height: 1.35;
+    font-size: 12px;
+  }
+  .window.mini-window.wrap-names .bar-row { align-items: flex-start; }
+
+  .empty-panel {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 14px 0; text-align: center;
+  }
+
+  /* ---------- Loading / error ---------- */
+  .loading, .errorbox {
+    padding: 24px; text-align: center;
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--ink-soft); font-size: 12px;
+    border: 1px dashed var(--rule); border-radius: 4px;
+  }
+  .errorbox { color: #b53b3b; border-color: #f3c8c8; background: #fdf3f3; }
+
+  footer {
+    margin-top: 48px; padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    display: flex; justify-content: space-between;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Auth gate (password screen) ===== -->
+<div id="auth-gate" class="auth-gate">
+  <div class="auth-card">
+    <p class="eyebrow">B2B Übersicht · Delivery</p>
+    <h1>Sign in to continue</h1>
+    <p class="auth-note">
+      This dashboard is access-controlled. Enter the team password to continue.
+    </p>
+    <form id="signin-form" autocomplete="off">
+      <input
+        id="pw-input"
+        class="pw-input"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Password"
+        autofocus
+        required
+      >
+      <button id="signin-btn" type="submit" class="signin-btn">Continue</button>
+    </form>
+    <p id="auth-error" class="auth-error" hidden></p>
+    <p class="auth-foot">Ask the dashboard owner if you don't know the password.</p>
+  </div>
+</div>
+
+<!-- ===== Dashboard (revealed after a successful sign-in) ===== -->
+<div id="dashboard" hidden>
+<div class="page">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">B2B Übersicht · Delivery</p>
+      <h1>Delivery State<br>by Calendar Week</h1>
+    </div>
+    <div class="meta">
+      <div class="user-block">
+        <button id="signout-btn" type="button">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Last 10 weeks</h2>
+      <span class="sub" id="range-label">—</span>
+    </div>
+    <div id="grid" class="grid">
+      <div class="loading">Loading data…</div>
+    </div>
+  </section>
+
+  <section id="detail" class="detail" hidden>
+    <div class="detail-head">
+      <div>
+        <div class="week-tag">Calendar Week</div>
+        <h2 id="detail-week-name">—</h2>
+      </div>
+      <div class="total-pill" id="detail-total">—</div>
+    </div>
+
+    <!-- InChange panel -->
+    <div id="panel-inchange" class="panel">
+      <div class="panel-head">
+        <span class="panel-dot" style="background: var(--c-inchange)"></span>
+        <span class="panel-title">InChangeProcess</span>
+        <span class="panel-stat" id="inchange-share">—</span>
+        <span class="panel-meta" id="inchange-meta">—</span>
+      </div>
+
+      <div class="filters" id="inchange-filters"></div>
+
+      <div class="windows" id="inchange-windows"></div>
+    </div>
+
+    <!-- Denied panel -->
+    <div id="panel-denied" class="panel">
+      <div class="panel-head">
+        <span class="panel-dot" style="background: var(--c-denied)"></span>
+        <span class="panel-title">Denied · Denial Reasons</span>
+        <span class="panel-meta" id="denied-meta">—</span>
+      </div>
+      <div id="denied-body"></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>B2B Übersicht / Main</span>
+    <span></span>
+  </footer>
+</div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG
+   ===================================================================== */
+
+/* ===== Apps Script backend =====
+   This is the /exec URL you get after deploying the bound Apps Script
+   as a web app. The script holds the team password (in its Script
+   Properties) and reads the sheet. The page will show a configuration
+   screen until this is set. */
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTCdnWMJRhta5ql0GhBtntMDeQtRjPoXU-6ebXOAVJpes9q2z7anaSpqIGDZbTmhj3MA/exec";
+
+const SHEET_NAME = "Main";  // sheet/tab name, used only in error messages
+
+const COL_WEEK         = "Start_CW ChangeProcess";
+const COL_STATE        = "Delivery State";
+const COL_DENIAL       = "Denial Reason";
+const COL_LP_TYPE      = "LastProcess Type";
+const COL_LP_ANSWER    = "LastProcess AnswerType";
+const COL_TXN_REASON   = "Transaction Reason";
+const COL_STARTED_WITH = "ChangeProcess Started With";
+const COL_DSO          = "DSO Name";
+const COL_PREV_SUPP    = "Previous Supplier";
+const COL_LP_DESC      = "LastProcess AnswerDescription";
+const COL_CONTRACT     = "Contract Number";
+
+/* Examples (Contract Numbers) shown per row at the deepest mini-window
+   layer. Increase or decrease as needed. */
+const MAX_EXAMPLES_PER_ROW = 2;
+
+const WEEKS_TO_SHOW = 10;
+const TOP_N = 7;
+
+/* Fixed display order for Process status. Types not in this list are
+   appended afterwards in count order. Answers within each type are
+   shown in this order. */
+const PROCESS_TYPE_ORDER  = ["MaLoIdent", "Cancellation", "Registration", "Unknown"];
+const PROCESS_ANSWER_ORDER = ["Denial", "Open", "Approval", "Unknown"];
+
+/* Which (type, answer) combinations should be expandable to show the
+   AnswerDescription breakdown. Set to null to allow all Denial rows. */
+const DENIAL_DRILLDOWN_TYPES = null;  // e.g. new Set(["Registration", "Cancellation"])
+
+const STATE_DEFS = [
+  { key: "Delivery",          label: "Delivery",          var: "--c-delivery"           },
+  { key: "DeliveryPending",   label: "DeliveryPending",   var: "--c-delivery-pending"   },
+  { key: "InChangeProcess",   label: "InChangeProcess",   var: "--c-inchange"           },
+  { key: "Revoked",           label: "Revoked",           var: "--c-revoked"            },
+  { key: "Denied",            label: "Denied",            var: "--c-denied"             },
+  { key: "Cancelled",         label: "Cancelled",         var: "--c-cancelled"          },
+  { key: "CancelledDelivery", label: "CancelledDelivery", var: "--c-cancelled-delivery" },
+];
+
+/* =====================================================================
+   AUTH — shared password (validated by the Apps Script backend)
+   ===================================================================== */
+let password = (() => {
+  try { return sessionStorage.getItem("dash_pw") || null; } catch (_) { return null; }
+})();
+
+function showAuthError(msg) {
+  const el = document.querySelector("#auth-error");
+  if (el) { el.textContent = msg; el.hidden = false; }
+}
+function clearAuthError() {
+  const el = document.querySelector("#auth-error");
+  if (el) el.hidden = true;
+}
+
+async function initAuth() {
+  if (!APPS_SCRIPT_URL) {
+    showAuthError("Configuration needed: set APPS_SCRIPT_URL in the source. See setup instructions.");
+    const btn = document.querySelector("#signin-btn");
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  document.querySelector("#signin-form").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    attemptSignIn();
+  });
+
+  // If a password is cached from this session, try it silently — the user
+  // doesn't have to re-enter it on every reload of the same tab.
+  if (password) {
+    await attemptSignIn({ silent: true });
+  }
+}
+
+async function attemptSignIn(opts) {
+  const silent = opts && opts.silent;
+  const input  = document.querySelector("#pw-input");
+  const btn    = document.querySelector("#signin-btn");
+
+  if (!silent) {
+    const pw = input.value.trim();
+    if (!pw) return;
+    password = pw;
+  }
+
+  clearAuthError();
+  if (btn) { btn.disabled = true; btn.textContent = "Checking…"; }
+
+  try {
+    await loadDashboard();   // performs the fetch + render; throws on failure
+    try { sessionStorage.setItem("dash_pw", password); } catch (_) {}
+    if (input) input.value = "";
+  } catch (err) {
+    password = null;
+    try { sessionStorage.removeItem("dash_pw"); } catch (_) {}
+    if (!silent) showAuthError(err.message || String(err));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Continue"; }
+  }
+}
+
+function signOut() {
+  password = null;
+  try { sessionStorage.removeItem("dash_pw"); } catch (_) {}
+  document.querySelector("#dashboard").hidden = true;
+  document.querySelector("#auth-gate").hidden = false;
+  const input = document.querySelector("#pw-input");
+  if (input) { input.value = ""; input.focus(); }
+  clearAuthError();
+}
+
+/* =====================================================================
+   FETCH — Apps Script web app validates the password and returns sheet
+   rows in the same response.
+   ===================================================================== */
+async function fetchSheetRows() {
+  if (!password) throw new Error("No password");
+
+  const url = `${APPS_SCRIPT_URL}?pw=${encodeURIComponent(password)}`;
+  const res = await fetch(url, { method: "GET" });
+  if (!res.ok) throw new Error(`Backend HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+
+  const values = data.values || [];
+  if (values.length < 2) return { rows: [], source: "sheet" };
+
+  // Column headers can contain newlines (e.g. "Start_CW\nChangeProcess").
+  // Normalise whitespace so the COL_* constants match regardless.
+  const headers = values[0].map(h =>
+    String(h ?? "").replace(/\s+/g, " ").trim()
+  );
+  const rows = values.slice(1).map(row => {
+    const o = {};
+    headers.forEach((h, i) => { if (h) o[h] = (row[i] ?? "").toString().trim(); });
+    return o;
+  });
+  return { rows, source: "sheet" };
+}
+
+/* =====================================================================
+   AGGREGATE — overview cards
+   ===================================================================== */
+const WEEK_RE = /^\d{4}-\d{2}$/;
+
+function aggregateCards(rows) {
+  const byWeek = new Map();
+  for (const r of rows) {
+    const w = String(r[COL_WEEK] ?? "").trim();
+    if (!WEEK_RE.test(w)) continue;
+    const s = String(r[COL_STATE] ?? "").trim();
+    if (!s) continue;
+    if (!byWeek.has(w)) byWeek.set(w, { week: w, total: 0, states: {} });
+    const b = byWeek.get(w);
+    b.states[s] = (b.states[s] || 0) + 1;
+    b.total += 1;
+  }
+  const all = [...byWeek.values()].sort((a, b) => a.week.localeCompare(b.week));
+  return all.slice(-WEEKS_TO_SHOW);
+}
+
+function uniqueValues(rows, col) {
+  const m = new Map();
+  for (const r of rows) {
+    const v = String(r[col] ?? "").trim();
+    if (!v) continue;
+    m.set(v, (m.get(v) || 0) + 1);
+  }
+  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+/* =====================================================================
+   RENDER — cards
+   ===================================================================== */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => document.querySelectorAll(sel);
+
+function pct(part, total) { return total ? (part / total) * 100 : 0; }
+function fmtPct(p) {
+  if (p === 0) return "0%";
+  if (p < 1)   return "<1%";
+  return `${Math.round(p)}%`;
+}
+
+function makeCard(weekData) {
+  const card = document.createElement("article");
+  card.className = "card";
+  card.dataset.week = weekData.week;
+
+  const head = document.createElement("div");
+  head.className = "card-head";
+  head.innerHTML = `
+    <div class="card-week">${weekData.week}</div>
+    <div class="card-total">
+      <span class="num">${weekData.total}</span>
+      <span class="label">contracts</span>
+    </div>
+  `;
+  card.appendChild(head);
+
+  const entries = STATE_DEFS
+    .map(def => ({ ...def, count: weekData.states[def.key] || 0 }))
+    .filter(e => e.count > 0);
+
+  const bar = document.createElement("div");
+  bar.className = "bar";
+  for (const e of entries) {
+    const seg = document.createElement("div");
+    seg.className = "bar-seg";
+    seg.style.width = pct(e.count, weekData.total) + "%";
+    seg.style.background = `var(${e.var})`;
+    seg.title = `${e.label}: ${e.count} (${fmtPct(pct(e.count, weekData.total))})`;
+    bar.appendChild(seg);
+  }
+  card.appendChild(bar);
+
+  const legend = document.createElement("div");
+  legend.className = "legend";
+  for (const e of entries) {
+    const p = pct(e.count, weekData.total);
+    const row = document.createElement("div");
+    row.className = "legend-row";
+    row.innerHTML = `
+      <span class="swatch" style="background:var(${e.var})"></span>
+      <span class="legend-name">${e.label}</span>
+      <span class="legend-count">${e.count}</span>
+      <span class="legend-pct">${fmtPct(p)}</span>
+    `;
+    legend.appendChild(row);
+  }
+  card.appendChild(legend);
+
+  card.addEventListener("click", () => selectWeek(weekData.week));
+  return card;
+}
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+const state = {
+  allRows: [],
+  cardData: [],
+  selectedWeek: null,
+  inchangeFilters: {
+    [COL_TXN_REASON]:   null,   // null = all on; otherwise a Set of allowed values
+    [COL_STARTED_WITH]: null,
+  },
+};
+
+function selectWeek(week) {
+  if (state.selectedWeek === week) return;
+  state.selectedWeek = week;
+  // reset InChange filters when switching weeks
+  state.inchangeFilters[COL_TXN_REASON]   = null;
+  state.inchangeFilters[COL_STARTED_WITH] = null;
+  document.querySelectorAll(".card").forEach(c => {
+    c.classList.toggle("selected", c.dataset.week === week);
+  });
+  renderDetail();
+  // Smooth scroll into view
+  setTimeout(() => {
+    $("#detail").scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 50);
+}
+
+/* =====================================================================
+   RENDER — detail (InChange + Denied)
+   ===================================================================== */
+function renderDetail() {
+  const week = state.selectedWeek;
+  const detail = $("#detail");
+  if (!week) { detail.hidden = true; return; }
+  detail.hidden = false;
+
+  $("#detail-week-name").textContent = week;
+  const weekRows = state.allRows.filter(r => String(r[COL_WEEK] ?? "").trim() === week);
+  $("#detail-total").textContent = `${weekRows.length} contracts in week`;
+
+  renderInChange(weekRows);
+  renderDenied(weekRows);
+}
+
+/* ---------- InChange ---------- */
+function renderInChange(weekRows) {
+  const inchangeRows = weekRows.filter(r => String(r[COL_STATE] ?? "").trim() === "InChangeProcess");
+
+  // Share of all contracts in the selected week — a stable headline stat
+  // that does NOT change as the user toggles the InChange filters.
+  const sharePct = weekRows.length ? (inchangeRows.length / weekRows.length) * 100 : 0;
+  const shareEl = $("#inchange-share");
+  if (inchangeRows.length === 0) {
+    shareEl.innerHTML = "";
+  } else {
+    shareEl.innerHTML = `${sharePct.toFixed(1)}%<span class="panel-stat-label">of week</span>`;
+  }
+
+  // Filter chips reflect the unfiltered InChange population for this week.
+  const txnValues     = uniqueValues(inchangeRows, COL_TXN_REASON);
+  const startedValues = uniqueValues(inchangeRows, COL_STARTED_WITH);
+
+  renderFilterRow("inchange-filters", "Transaction Reason",         COL_TXN_REASON,   txnValues);
+  appendFilterRow("inchange-filters", "ChangeProcess Started With", COL_STARTED_WITH, startedValues);
+
+  // Apply current filters
+  const filtered = inchangeRows.filter(rowPassesInChangeFilters);
+  $("#inchange-meta").textContent =
+    filtered.length === inchangeRows.length
+      ? `${inchangeRows.length} contracts`
+      : `${filtered.length} of ${inchangeRows.length} contracts`;
+
+  const win = $("#inchange-windows");
+  win.innerHTML = "";
+
+  if (!filtered.length) {
+    win.innerHTML = `<div class="empty-panel" style="grid-column: 1 / -1;">No InChange contracts match the current filters.</div>`;
+    return;
+  }
+
+  // Process status (full width) — DSO + Previous Supplier are now
+  // drilled into inside each answer-type expansion.
+  win.appendChild(renderComboWindow(filtered));
+}
+
+function rowPassesInChangeFilters(r) {
+  for (const col of [COL_TXN_REASON, COL_STARTED_WITH]) {
+    const allowed = state.inchangeFilters[col];
+    if (allowed == null) continue; // null = all
+    const v = String(r[col] ?? "").trim();
+    if (!allowed.has(v)) return false;
+  }
+  return true;
+}
+
+function renderFilterRow(containerId, label, col, values) {
+  const cont = $("#" + containerId);
+  cont.innerHTML = ""; // first call clears
+  cont.appendChild(buildFilterLine(label, col, values));
+}
+function appendFilterRow(containerId, label, col, values) {
+  $("#" + containerId).appendChild(buildFilterLine(label, col, values));
+}
+function buildFilterLine(label, col, values) {
+  const line = document.createElement("div");
+  line.className = "filter-line";
+
+  const lab = document.createElement("span");
+  lab.className = "filter-label";
+  lab.textContent = label;
+  line.appendChild(lab);
+
+  const allOn = state.inchangeFilters[col] == null;
+  for (const [val, count] of values) {
+    const on = allOn || state.inchangeFilters[col].has(val);
+    const chip = document.createElement("button");
+    chip.className = "chip" + (on ? " active" : "");
+    chip.innerHTML = `<span>${val}</span><span class="chip-count">${count}</span>`;
+    chip.addEventListener("click", () => toggleFilter(col, val, values));
+    line.appendChild(chip);
+  }
+
+  // Mini reset
+  const reset = document.createElement("button");
+  reset.className = "chip-mini";
+  reset.textContent = allOn ? "" : "Reset";
+  reset.addEventListener("click", () => {
+    state.inchangeFilters[col] = null;
+    renderDetail();
+  });
+  if (!allOn) line.appendChild(reset);
+
+  return line;
+}
+
+function toggleFilter(col, val, allValues) {
+  let set = state.inchangeFilters[col];
+  if (set == null) {
+    // First click: switch from "all" to "everything except this one"
+    set = new Set(allValues.map(([v]) => v));
+    set.delete(val);
+  } else {
+    if (set.has(val)) set.delete(val); else set.add(val);
+    // If all values present again, collapse back to null (all)
+    if (set.size === allValues.length) set = null;
+  }
+  state.inchangeFilters[col] = set;
+  renderDetail();
+}
+
+/* ---------- Windows ---------- */
+function makeWindow(title, totalLabel) {
+  const w = document.createElement("div");
+  w.className = "window";
+  const h = document.createElement("h3");
+  h.innerHTML = `<span>${title}</span><span class="w-total">${totalLabel}</span>`;
+  w.appendChild(h);
+  return w;
+}
+
+/* ---------- Process status: Type → Answer hierarchy ---------- */
+
+const TYPE_ICONS = {
+  "MaLoIdent": `<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="15" height="11" rx="1.2"/><circle cx="7" cy="9.5" r="1.6"/><path d="M4.4 13.2c.6-1.1 1.6-1.7 2.6-1.7s2 .6 2.6 1.7"/><path d="M12 8.5h3.5M12 11h3M12 13.2h2.5"/></svg>`,
+  "Cancellation": `<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M6.5 6.5l7 7M13.5 6.5l-7 7"/></svg>`,
+  "Registration": `<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h7l3 3v11a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M12 3v3h3"/><path d="M6.5 9h7M6.5 11.5h7M6.5 14h4.5"/></svg>`,
+  "Unknown": `<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.2L18 16.5H2L10 2.2z"/><path d="M10 8v3.5"/><circle cx="10" cy="13.7" r="0.5" fill="currentColor" stroke="none"/></svg>`,
+};
+
+function isDenialDrilldown(type) {
+  if (DENIAL_DRILLDOWN_TYPES === null) return true;
+  return DENIAL_DRILLDOWN_TYPES.has(type);
+}
+
+function renderComboWindow(rows) {
+  const w = makeWindow("Process status", `${rows.length} contracts`);
+  const total = rows.length;
+
+  // group by Type → Answer → list of rows (so we can later count descriptions)
+  const byType = new Map();
+  for (const r of rows) {
+    const t = String(r[COL_LP_TYPE] ?? "").trim() || "Unknown";
+    const a = String(r[COL_LP_ANSWER] ?? "").trim() || "Unknown";
+    if (!byType.has(t)) byType.set(t, { count: 0, answers: new Map() });
+    const tBucket = byType.get(t);
+    tBucket.count += 1;
+    if (!tBucket.answers.has(a)) tBucket.answers.set(a, { count: 0, rows: [] });
+    const aBucket = tBucket.answers.get(a);
+    aBucket.count += 1;
+    aBucket.rows.push(r);
+  }
+
+  // Determine the type display order: fixed prefix, then any extras by count.
+  const knownTypes = new Set(PROCESS_TYPE_ORDER);
+  const extraTypes = [...byType.keys()]
+    .filter(t => !knownTypes.has(t))
+    .sort((a, b) => byType.get(b).count - byType.get(a).count);
+  const typeOrder = [...PROCESS_TYPE_ORDER, ...extraTypes];
+
+  // Width scale: not used for parent rows anymore (no bar), but kept for
+  // any future per-row visual scaling that's needed.
+  // eslint-disable-next-line no-unused-vars
+  const maxParent = Math.max(1, ...[...byType.values()].map(b => b.count));
+
+  let rendered = 0;  // counts only types actually drawn this render
+  for (const t of typeOrder) {
+    const bucket = byType.get(t);
+    if (!bucket) continue; // type not present this week
+
+    // Parent row — no background bar; a divider line separates groups.
+    const parent = document.createElement("div");
+    parent.className = "bar-row ps-parent" + (rendered > 0 ? " ps-divider" : "");
+    parent.innerHTML = `
+      <span class="br-name ps-typename">
+        <span class="ps-icon">${TYPE_ICONS[t] || TYPE_ICONS["Unknown"]}</span>
+        <span>${t}</span>
+      </span>
+      <span class="br-count">${bucket.count}</span>
+      <span class="br-pct">${fmtPct(pct(bucket.count, total))}</span>
+    `;
+    w.appendChild(parent);
+    rendered += 1;
+
+    // Sub-rows (answers)
+    const answerOrder = [
+      ...PROCESS_ANSWER_ORDER.filter(a => bucket.answers.has(a)),
+      ...[...bucket.answers.keys()].filter(a => !PROCESS_ANSWER_ORDER.includes(a)),
+    ];
+
+    for (const a of answerOrder) {
+      const aBucket = bucket.answers.get(a);
+      const isDenial = a === "Denial";
+      // Every answer row is expandable (showing DSO + Prev Supplier;
+      // Denial additionally shows Description as a 3rd mini-window).
+      const expandable = aBucket.count > 0;
+
+      const sub = document.createElement("div");
+      sub.className = "bar-row ps-sub" + (isDenial ? " ps-sub-denial" : "") + (expandable ? " expandable" : "");
+      sub.innerHTML = `
+        <span class="br-name ps-subname">
+          <span class="ps-elbow">↳</span>
+          <span class="ps-answer">${a}</span>
+          ${expandable ? `<span class="ps-chev" aria-hidden="true">▾</span>` : ""}
+        </span>
+        <span class="br-count">${aBucket.count}</span>
+        <span class="br-pct">${fmtPct(pct(aBucket.count, total))}</span>
+      `;
+      w.appendChild(sub);
+
+      if (expandable) {
+        const drill = document.createElement("div");
+        drill.className = "ps-drill" + (isDenial ? " ps-drill-denial" : "");
+        drill.hidden = true;
+        drill.appendChild(renderAnswerDrilldown(aBucket.rows, isDenial));
+        w.appendChild(drill);
+
+        sub.addEventListener("click", () => {
+          const open = drill.hidden;
+          drill.hidden = !open;
+          sub.classList.toggle("open", open);
+        });
+      }
+    }
+  }
+  return w;
+}
+
+/* Build the drill-down content shown when an answer-type sub-row is
+   expanded. For Denial rows we show 3 mini-windows (Description, DSO,
+   Previous Supplier); for other answers we show just DSO + Previous
+   Supplier. */
+function renderAnswerDrilldown(rows, isDenial) {
+  const wrap = document.createElement("div");
+  wrap.className = "ps-drill-grid" + (isDenial ? " cols-3" : " cols-2");
+  // Use the same neutral grey for all bars regardless of answer type —
+  // colour comes from the panel context, not the mini-window bars.
+  const barColor = "rgba(214,214,214,0.55)";
+
+  if (isDenial) {
+    wrap.appendChild(renderMiniWindow({
+      title: "Denial reason",
+      rows, col: COL_LP_DESC, barColor,
+      // Descriptions can be long German sentences — let them wrap.
+      wrap: true,
+    }));
+  }
+  wrap.appendChild(renderMiniWindow({
+    title: "Top DSO",
+    rows, col: COL_DSO, barColor,
+  }));
+  wrap.appendChild(renderMiniWindow({
+    title: "Top previous supplier",
+    rows, col: COL_PREV_SUPP, barColor,
+  }));
+  return wrap;
+}
+
+/* Reusable "top values for a column" mini-list. Used both inside the
+   answer-type drill-downs and by the standalone Denied panel. Each row
+   shows up to MAX_EXAMPLES_PER_ROW example Contract Numbers under the
+   name. */
+function renderMiniWindow({ title, rows, col, barColor, wrap = false }) {
+  // Group rows by the chosen column, also collecting example Contract
+  // Numbers in iteration order (deterministic, no randomness).
+  const groups = new Map();
+  for (const r of rows) {
+    const v = String(r[col] ?? "").trim();
+    if (!v) continue;
+    if (!groups.has(v)) groups.set(v, { count: 0, examples: [] });
+    const g = groups.get(v);
+    g.count += 1;
+    if (g.examples.length < MAX_EXAMPLES_PER_ROW) {
+      const cn = String(r[COL_CONTRACT] ?? "").trim();
+      if (cn) g.examples.push(cn);
+    }
+  }
+  const items = [...groups.entries()].sort((a, b) => b[1].count - a[1].count);
+  const total = rows.length;
+  const top  = items.slice(0, TOP_N);
+  const rest = items.slice(TOP_N);
+  const restCount = rest.reduce((a, [, g]) => a + g.count, 0);
+
+  const w = makeWindow(title, `${items.length}`);
+  w.classList.add("mini-window");
+  if (wrap) w.classList.add("wrap-names");
+
+  if (!items.length) {
+    w.appendChild(Object.assign(document.createElement("div"),
+      { className: "empty-panel", textContent: "No data" }));
+    return w;
+  }
+
+  const max = top[0][1].count;
+  for (const [name, g] of top) {
+    const row = document.createElement("div");
+    row.className = "bar-row has-examples";
+    row.style.setProperty("--w", `${(g.count / max) * 100}%`);
+    row.style.setProperty("--bar", barColor);
+    const examplesHtml = g.examples.length
+      ? `<span class="br-examples">${g.examples.join(" · ")}</span>` : "";
+    row.innerHTML = `
+      <span class="br-namecell">
+        <span class="br-name" title="${String(name).replace(/"/g, '&quot;')}">${name || "—"}</span>
+        ${examplesHtml}
+      </span>
+      <span class="br-count">${g.count}</span>
+      <span class="br-pct">${fmtPct(pct(g.count, total))}</span>
+    `;
+    w.appendChild(row);
+  }
+  if (rest.length) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.style.setProperty("--w", `${(restCount / max) * 100}%`);
+    row.style.setProperty("--bar", barColor.replace(/[\d.]+\)$/, "0.25)"));
+    row.innerHTML = `
+      <span class="br-name" style="color: var(--ink-soft); font-style: italic;">+ ${rest.length} other${rest.length===1?"":"s"}</span>
+      <span class="br-count">${restCount}</span>
+      <span class="br-pct">${fmtPct(pct(restCount, total))}</span>
+    `;
+    w.appendChild(row);
+  }
+  return w;
+}
+
+/* Legacy wrapper retained so renderDenied can keep calling renderTopWindow. */
+function renderTopWindow(title, rows, col) {
+  return renderMiniWindow({ title, rows, col, barColor: "rgba(214,214,214,0.55)" });
+}
+
+/* ---------- Denied ---------- */
+function renderDenied(weekRows) {
+  const deniedRows = weekRows.filter(r => String(r[COL_STATE] ?? "").trim() === "Denied");
+  $("#denied-meta").textContent = `${deniedRows.length} contracts`;
+
+  const body = $("#denied-body");
+  body.innerHTML = "";
+
+  if (!deniedRows.length) {
+    body.innerHTML = `<div class="empty-panel">No denied contracts this week.</div>`;
+    return;
+  }
+
+  const reasons = uniqueValues(deniedRows, COL_DENIAL);
+  const total = deniedRows.length;
+  const max = reasons[0][1];
+
+  const wrap = document.createElement("div");
+  wrap.style.display = "grid";
+  wrap.style.gap = "4px";
+
+  for (const [name, count] of reasons) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.style.setProperty("--w", `${(count / max) * 100}%`);
+    row.style.setProperty("--bar", "rgba(247,200,154,0.55)");
+    row.innerHTML = `
+      <span class="br-name">${name || "—"}</span>
+      <span class="br-count">${count}</span>
+      <span class="br-pct">${fmtPct(pct(count, total))}</span>
+    `;
+    wrap.appendChild(row);
+  }
+  body.appendChild(wrap);
+}
+
+/* =====================================================================
+   MAIN RENDER
+   ===================================================================== */
+function renderCards(cards) {
+  const grid = $("#grid");
+  grid.innerHTML = "";
+
+  if (!cards.length) {
+    grid.innerHTML = `<div class="errorbox">No weekly data found in the sheet.</div>`;
+    return;
+  }
+  for (const c of cards) grid.appendChild(makeCard(c));
+
+  $("#range-label").textContent = `${cards[0].week} → ${cards[cards.length - 1].week}`;
+}
+
+/* =====================================================================
+   DASHBOARD BOOTSTRAP (called from attemptSignIn — throws on failure
+   so the auth gate can surface the error)
+   ===================================================================== */
+async function loadDashboard() {
+  const { rows } = await fetchSheetRows();
+  state.allRows = rows;
+  state.cardData = aggregateCards(rows);
+  renderCards(state.cardData);
+  if (state.cardData.length) {
+    selectWeek(state.cardData[state.cardData.length - 1].week);
+  }
+  // Reveal dashboard / hide auth gate only after a clean render.
+  document.querySelector("#auth-gate").hidden = true;
+  document.querySelector("#dashboard").hidden = false;
+}
+
+/* =====================================================================
+   PAGE BOOT
+   ===================================================================== */
+(function boot() {
+  const signOutBtn = $("#signout-btn");
+  if (signOutBtn) signOutBtn.addEventListener("click", signOut);
+
+  initAuth();
+})();
+</script>
+</body>
+</html>
