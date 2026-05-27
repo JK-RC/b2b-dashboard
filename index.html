@@ -7,7 +7,11 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Fonts loaded non-blocking: render the page immediately with system fonts,
+     then swap in the web fonts once they arrive. If fonts.googleapis.com is
+     slow or blocked, the page still shows up. -->
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 
 <style>
   :root {
@@ -691,8 +695,10 @@
 </head>
 <body>
 
-<!-- ===== Auth gate (password screen) ===== -->
-<div id="auth-gate" class="auth-gate">
+<!-- ===== Auth gate (password screen) =====
+     Inline `style` is a belt-and-suspenders fallback so this element is
+     visible even if the main stylesheet doesn't load. -->
+<div id="auth-gate" class="auth-gate" style="display:flex; min-height:100vh; align-items:center; justify-content:center; padding:40px 24px; background:#f6f3ec;">
   <div class="auth-card">
     <p class="eyebrow">B2B Dashboard</p>
     <h1>Sign in to continue</h1>
@@ -895,7 +901,13 @@ async function attemptSignIn(opts) {
   } catch (err) {
     password = null;
     try { sessionStorage.removeItem("dash_pw"); } catch (_) {}
-    if (!silent) showAuthError(err.message || String(err));
+    // Always surface the error — silent mode used to swallow it, which
+    // looked like a blank page from the user's side. Reverting to the
+    // auth gate (in case loadDashboard had partially shown the dashboard
+    // before throwing) ensures something is visible.
+    document.querySelector("#auth-gate").style.display = "flex";
+    document.querySelector("#dashboard").style.display = "none";
+    showAuthError(err.message || String(err));
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "Continue"; }
   }
@@ -1488,10 +1500,12 @@ async function loadDashboard() {
    PAGE BOOT
    ===================================================================== */
 (function boot() {
+  console.log("[B2B Dashboard] boot started");
   const signOutBtn = $("#signout-btn");
   if (signOutBtn) signOutBtn.addEventListener("click", signOut);
 
   initAuth();
+  console.log("[B2B Dashboard] boot ok");
 })();
 </script>
 </body>
