@@ -145,18 +145,40 @@
   .user-block button:hover { color: var(--ink); border-bottom-color: var(--ink); }
 
   /* ===== Auth gate ===== */
-  /* The `hidden` HTML attribute hides #dashboard via the user-agent
-     default (display: none). For #auth-gate we need a slightly more
-     specific rule, because .auth-gate sets display:flex and would
-     otherwise win over `hidden`. */
-  .auth-gate[hidden] { display: none; }
-
-  .auth-gate {
+  /* ===== Initial loading + auth gates =====
+     `loading-gate` is shown first on every page load. The boot code
+     either replaces it with the dashboard (silent sign-in) or with
+     the auth gate (no cached password, or silent attempt failed). */
+  .loading-gate, .auth-gate {
     min-height: 100vh;
     display: flex; align-items: center; justify-content: center;
     padding: 40px 24px;
     background: var(--bg);
   }
+  .loading-gate[hidden],
+  .auth-gate[hidden] { display: none; }
+  .loading-text {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  .loading-text::after {
+    content: "";
+    display: inline-block;
+    width: 6px; height: 6px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--ink-soft);
+    animation: dot-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.25; }
+    50%      { opacity: 1; }
+  }
+
   .auth-card {
     background: var(--paper);
     border: 1px solid var(--rule);
@@ -696,8 +718,13 @@
 </head>
 <body>
 
-<!-- ===== Auth gate (password screen) ===== -->
-<div id="auth-gate" class="auth-gate">
+<!-- ===== Loading splash (shown until boot decides which screen to show) ===== -->
+<div id="loading-gate" class="loading-gate">
+  <p class="loading-text">Loading</p>
+</div>
+
+<!-- ===== Auth gate (password screen) — hidden until the boot code decides it's needed ===== -->
+<div id="auth-gate" class="auth-gate" hidden>
   <div class="auth-card">
     <p class="eyebrow">B2B Dashboard</p>
     <h1>Sign in to continue</h1>
@@ -893,8 +920,16 @@ function clearAuthError() {
   if (el) el.hidden = true;
 }
 
+/* Show exactly one of: loading, auth, dashboard. */
+function showScreen(which) {
+  document.querySelector("#loading-gate").hidden = which !== "loading";
+  document.querySelector("#auth-gate").hidden    = which !== "auth";
+  document.querySelector("#dashboard").hidden    = which !== "dashboard";
+}
+
 async function initAuth() {
   if (!APPS_SCRIPT_URL) {
+    showScreen("auth");
     showAuthError("Configuration needed: set APPS_SCRIPT_URL in the source. See setup instructions.");
     const btn = document.querySelector("#signin-btn");
     if (btn) btn.disabled = true;
@@ -906,10 +941,13 @@ async function initAuth() {
     attemptSignIn();
   });
 
-  // If a password is cached from this session, try it silently — the user
-  // doesn't have to re-enter it on every reload of the same tab.
   if (password) {
+    // Silent attempt — keep the loading splash up while it runs. If it
+    // succeeds the dashboard takes over; if it fails the auth gate
+    // appears with the error.
     await attemptSignIn({ silent: true });
+  } else {
+    showScreen("auth");
   }
 }
 
@@ -934,12 +972,7 @@ async function attemptSignIn(opts) {
   } catch (err) {
     password = null;
     clearCachedPassword();
-    // Always surface the error — silent mode used to swallow it, which
-    // looked like a blank page from the user's side. Reverting to the
-    // auth gate (in case loadDashboard had partially shown the dashboard
-    // before throwing) ensures something is visible.
-    document.querySelector("#dashboard").hidden = true;
-    document.querySelector("#auth-gate").hidden = false;
+    showScreen("auth");
     showAuthError(err.message || String(err));
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "Continue"; }
@@ -949,8 +982,7 @@ async function attemptSignIn(opts) {
 function signOut() {
   password = null;
   clearCachedPassword();
-  document.querySelector("#dashboard").hidden = true;
-  document.querySelector("#auth-gate").hidden = false;
+  showScreen("auth");
   const input = document.querySelector("#pw-input");
   if (input) { input.value = ""; input.focus(); }
   clearAuthError();
@@ -1521,9 +1553,8 @@ async function loadDashboard() {
     // should land on the Last 10 weeks overview, not the detail panel.
     selectWeek(state.cardData[state.cardData.length - 1].week, { noScroll: true });
   }
-  // Reveal dashboard / hide auth gate only after a clean render.
-  document.querySelector("#auth-gate").hidden = true;
-  document.querySelector("#dashboard").hidden = false;
+  // Reveal dashboard / hide loading & auth gate only after a clean render.
+  showScreen("dashboard");
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
