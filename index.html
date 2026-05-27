@@ -846,9 +846,43 @@ const STATE_DEFS = [
 /* =====================================================================
    AUTH — shared password (validated by the Apps Script backend)
    ===================================================================== */
-let password = (() => {
-  try { return sessionStorage.getItem("dash_pw") || null; } catch (_) { return null; }
-})();
+
+/* How long to remember a successful sign-in before asking for the password
+   again. Set to 0 to require the password every reload, or raise it to
+   30/90 if you want it remembered longer. */
+const REMEMBER_FOR_DAYS = 7;
+
+const PW_STORAGE_KEY = "dash_pw_v1";
+
+function loadCachedPassword() {
+  try {
+    const raw = localStorage.getItem(PW_STORAGE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || typeof obj.pw !== "string" || typeof obj.ts !== "number") return null;
+    const ageMs = Date.now() - obj.ts;
+    const maxMs = REMEMBER_FOR_DAYS * 24 * 60 * 60 * 1000;
+    if (maxMs <= 0 || ageMs > maxMs) {
+      localStorage.removeItem(PW_STORAGE_KEY);
+      return null;
+    }
+    return obj.pw;
+  } catch (_) {
+    return null;
+  }
+}
+
+function savePassword(pw) {
+  try {
+    localStorage.setItem(PW_STORAGE_KEY, JSON.stringify({ pw, ts: Date.now() }));
+  } catch (_) {}
+}
+
+function clearCachedPassword() {
+  try { localStorage.removeItem(PW_STORAGE_KEY); } catch (_) {}
+}
+
+let password = loadCachedPassword();
 
 function showAuthError(msg) {
   const el = document.querySelector("#auth-error");
@@ -895,17 +929,17 @@ async function attemptSignIn(opts) {
 
   try {
     await loadDashboard();   // performs the fetch + render; throws on failure
-    try { sessionStorage.setItem("dash_pw", password); } catch (_) {}
+    savePassword(password);
     if (input) input.value = "";
   } catch (err) {
     password = null;
-    try { sessionStorage.removeItem("dash_pw"); } catch (_) {}
+    clearCachedPassword();
     // Always surface the error — silent mode used to swallow it, which
     // looked like a blank page from the user's side. Reverting to the
     // auth gate (in case loadDashboard had partially shown the dashboard
     // before throwing) ensures something is visible.
-    document.querySelector("#auth-gate").style.display = "flex";
-    document.querySelector("#dashboard").style.display = "none";
+    document.querySelector("#dashboard").hidden = true;
+    document.querySelector("#auth-gate").hidden = false;
     showAuthError(err.message || String(err));
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "Continue"; }
@@ -914,7 +948,7 @@ async function attemptSignIn(opts) {
 
 function signOut() {
   password = null;
-  try { sessionStorage.removeItem("dash_pw"); } catch (_) {}
+  clearCachedPassword();
   document.querySelector("#dashboard").hidden = true;
   document.querySelector("#auth-gate").hidden = false;
   const input = document.querySelector("#pw-input");
