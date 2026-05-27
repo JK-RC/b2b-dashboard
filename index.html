@@ -141,6 +141,11 @@
   .user-block button:hover { color: var(--ink); border-bottom-color: var(--ink); }
 
   /* ===== Auth gate ===== */
+  /* The native `hidden` HTML attribute should always win over CSS
+     display: rules so that hiding/showing #auth-gate and #dashboard
+     just works. */
+  [hidden] { display: none !important; }
+
   .auth-gate {
     min-height: 100vh;
     display: flex; align-items: center; justify-content: center;
