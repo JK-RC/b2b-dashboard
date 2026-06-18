@@ -650,18 +650,36 @@
   }
   .ps-drill-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
   .ps-drill-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .ps-drill-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
   /* Thin vertical separator between adjacent mini-windows */
   .ps-drill-grid > .mini-window + .mini-window {
     border-left: 1px solid rgba(0,0,0,0.09);
     padding-left: 20px;
   }
+  /* Tighter screens: collapse the 4-up into 2x2, then a single column. */
+  @media (max-width: 1300px) {
+    .ps-drill-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+    /* In 2x2 mode, only every other mini-window has a left neighbour. */
+    .ps-drill-grid.cols-4 > .mini-window:nth-child(2n+1) {
+      border-left: none;
+      padding-left: 0;
+    }
+    .ps-drill-grid.cols-4 > .mini-window:nth-child(n+3) {
+      border-top: 1px solid rgba(0,0,0,0.09);
+      padding-top: 14px;
+      margin-top: 6px;
+    }
+  }
   @media (max-width: 1100px) {
-    .ps-drill-grid.cols-3, .ps-drill-grid.cols-2 { grid-template-columns: 1fr; }
+    .ps-drill-grid.cols-3, .ps-drill-grid.cols-2, .ps-drill-grid.cols-4 { grid-template-columns: 1fr; }
     .ps-drill-grid > .mini-window + .mini-window {
       border-left: none;
       padding-left: 0;
       padding-top: 14px;
       border-top: 1px solid rgba(0,0,0,0.09);
+    }
+    .ps-drill-grid.cols-4 > .mini-window:nth-child(n+3) {
+      margin-top: 0;
     }
   }
 
@@ -842,6 +860,7 @@ const COL_DSO          = "DSOName";
 const COL_PREV_SUPP    = "PreviousSupplier";
 const COL_LP_DESC      = "LPAD";
 const COL_CONTRACT     = "ContractNumber";
+const COL_COMPANY      = "CompanyName";
 
 /* Examples (Contract Numbers) shown per row at the deepest mini-window
    layer. Increase or decrease as needed. */
@@ -1390,26 +1409,39 @@ function renderComboWindow(rows) {
    Supplier. */
 function renderAnswerDrilldown(rows, isDenial) {
   const wrap = document.createElement("div");
-  wrap.className = "ps-drill-grid" + (isDenial ? " cols-3" : " cols-2");
+  wrap.className = "ps-drill-grid" + (isDenial ? " cols-4" : " cols-3");
   // Use the same neutral grey for all bars regardless of answer type —
   // colour comes from the panel context, not the mini-window bars.
   const barColor = "rgba(214,214,214,0.55)";
 
+  // Denial gets a 4th column (the denial reason itself). All other
+  // answer types share the same 3-column shape: DSO, Previous supplier,
+  // Company. All mini-windows show every value (no Top-N cap) so
+  // nothing is hidden behind a "+ N others" rollup.
   if (isDenial) {
     wrap.appendChild(renderMiniWindow({
       title: "Denial reason",
       rows, col: COL_LP_DESC, barColor,
       // Descriptions can be long German sentences — let them wrap.
       wrap: true,
+      showAll: true,
     }));
   }
   wrap.appendChild(renderMiniWindow({
-    title: "Top DSO",
+    title: "DSO",
     rows, col: COL_DSO, barColor,
+    showAll: true,
   }));
   wrap.appendChild(renderMiniWindow({
-    title: "Top previous supplier",
+    title: "Previous supplier",
     rows, col: COL_PREV_SUPP, barColor,
+    showAll: true,
+  }));
+  wrap.appendChild(renderMiniWindow({
+    title: "Company",
+    rows, col: COL_COMPANY, barColor,
+    wrap: true,   // company names can be long — allow wrapping
+    showAll: true,
   }));
   return wrap;
 }
@@ -1418,7 +1450,7 @@ function renderAnswerDrilldown(rows, isDenial) {
    answer-type drill-downs and by the standalone Denied panel. Each row
    shows up to MAX_EXAMPLES_PER_ROW example Contract Numbers under the
    name. */
-function renderMiniWindow({ title, rows, col, barColor, wrap = false }) {
+function renderMiniWindow({ title, rows, col, barColor, wrap = false, showAll = false }) {
   // Group rows by the chosen column, also collecting example Contract
   // Numbers in iteration order (deterministic, no randomness).
   const groups = new Map();
@@ -1435,8 +1467,10 @@ function renderMiniWindow({ title, rows, col, barColor, wrap = false }) {
   }
   const items = [...groups.entries()].sort((a, b) => b[1].count - a[1].count);
   const total = rows.length;
-  const top  = items.slice(0, TOP_N);
-  const rest = items.slice(TOP_N);
+  // showAll: render every group; otherwise cap at TOP_N with a "+ N others" rollup.
+  const limit = showAll ? items.length : TOP_N;
+  const top  = items.slice(0, limit);
+  const rest = items.slice(limit);
   const restCount = rest.reduce((a, [, g]) => a + g.count, 0);
 
   const w = makeWindow(title, `${items.length}`);
